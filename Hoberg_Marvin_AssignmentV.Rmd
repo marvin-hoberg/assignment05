@@ -1,0 +1,20 @@
+---
+title: "Assignment 05"
+author: 'Marvin Hoberg'
+date: "1/10/2022"
+output: 
+  html_document:
+    toc: true 
+    theme: lumen 
+---
+
+## Code of conduct 
+I hereby declare that this is solely my own work and my own code.
+
+```{r setup, include=FALSE, message=FALSE}
+# set up program and R Markdown file
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/Coding/R_Programming/DSPM/assignment05")
+rm(list = ls())  # clear environment 
+```
+
