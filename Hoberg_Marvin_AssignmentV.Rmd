@@ -18,3 +18,56 @@ knitr::opts_knit$set(root.dir = "~/Coding/R_Programming/DSPM/assignment05")
 rm(list = ls())  # clear environment 
 ```
 
+```{r packages, message=FALSE}
+# load all necessary packages 
+if (!require("jsonlite")) install.packages("jsonlite")
+if (!require("httr")) install.packages("httr")
+if (!require("rlist")) install.packages("rlist")
+if (!require("tidyverse")) install.packages("tidyverse")
+if (!require("plyr")) install.packages("plyr")
+
+library(jsonlite)
+library(httr)
+library(rlist)
+library(tidyverse)
+library(plyr)
+```
+
+```{r API, message=FALSE}
+# respective API key is stored in secret file. Might be changed by user. 
+# source file 
+source("ticketmaster_key.R")
+
+# first get command 
+ger_venue_response <-
+  GET(
+    "https://app.ticketmaster.com/discovery/v2/events.json?",
+    query = list(countryCode = "DE",
+                 apikey = ticketmaster_key)
+  )
+
+venue_data1 <- jsonlite::fromJSON(content(ger_venue_response, as = "text"))
+# or use: content(ger_venue_response, as = "text") 
+# but caution: this might lead to an error
+
+# create data frame 
+venue_data1_parsed <- venue_data1[["_embedded"]][["events"]][["_embedded"]][["venues"]]
+
+df1 <- lapply(1:length(venue_data1_parsed), function(i) {
+  df <- venue_data1_parsed[[i]]
+  
+  data.frame(
+    name = ifelse("name" %in% names(df) == TRUE, df$name, NA),  # check whether a name exists within nested list 
+    city = df$city$name,
+    postalCode = df$postalCode,
+    address = ifelse("address" %in% names(df) == TRUE, df$address$line1, NA),  # check whether an address exists within nested list 
+    url = df$url,
+    long = df$location$longitude,
+    lat = df$location$latitude,
+    stringsAsFactors = FALSE
+  )
+})
+
+df_venue_data1 <- do.call(rbind, df1)
+
+```
