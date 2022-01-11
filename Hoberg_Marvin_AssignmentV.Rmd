@@ -62,12 +62,16 @@ df1 <- lapply(1:length(venue_data1_parsed), function(i) {
     postalCode = df$postalCode,
     address = ifelse("address" %in% names(df) == TRUE, df$address$line1, NA),  # check whether an address exists within nested list 
     url = df$url,
-    long = df$location$longitude,
-    lat = df$location$latitude,
+    long = as.double(df$location$longitude),
+    lat = as.double(df$location$latitude),
     stringsAsFactors = FALSE
   )
 })
 
 df_venue_data1 <- do.call(rbind, df1)
+
+# check the required data structure
+glimpse(df_venue_data1)
+
 
 ```
