@@ -41,20 +41,25 @@ source("ticketmaster_key.R")
 # first get command 
 ger_venue_response <-
   GET(
-    "https://app.ticketmaster.com/discovery/v2/events.json?",
+    "https://app.ticketmaster.com/discovery/v2/venues?",
     query = list(countryCode = "DE",
+                 locale = "*",
+                 # The locale in ISO code format. Multiple comma-separated values can be provided. 
+                 # When omitting the country part of the code (e.g. only 'en' or 'fr') then the first matching locale is used. 
+                 # When using a '*' it matches all locales. '*' can only be used at the end (e.g. 'en-us,en,*')
                  apikey = ticketmaster_key)
   )
 
+# extract content and transform JSON to R List 
 venue_data1 <- jsonlite::fromJSON(content(ger_venue_response, as = "text"))
 # or use: content(ger_venue_response, as = "text") 
 # but caution: this might lead to an error
 
-# create data frame 
-venue_data1_parsed <- venue_data1[["_embedded"]][["events"]][["_embedded"]][["venues"]]
+# create parsed data frame 
+venue_data1_parsed <- venue_data1[["_embedded"]][["venues"]]
 
-df1 <- lapply(1:length(venue_data1_parsed), function(i) {
-  df <- venue_data1_parsed[[i]]
+df1 <- lapply(1:nrow(venue_data1_parsed), function(i) {
+  df <- venue_data1_parsed[i,]
   
   data.frame(
     name = ifelse("name" %in% names(df) == TRUE, df$name, NA),  # check whether a name exists within nested list 
@@ -73,5 +78,78 @@ df_venue_data1 <- do.call(rbind, df1)
 # check the required data structure
 glimpse(df_venue_data1)
 
-
 ```
+
+```{r advanced venue search, message=FALSE}
+# empty data frame for computational speed
+#n <- venue_data1[["page"]][["totalElements"]]
+
+df_venue_data2 <- 
+  data.frame(
+    name = character(),
+    city = character(),
+    postalCode = character(),
+    address = character(),
+    url = character(),
+    long = double(),
+    lat = double(),
+    stringsAsFactors = FALSE
+)
+
+
+# get large data set with all German venues 
+first_page <- venue_data1[["page"]][["number"]]  # page number 0 
+last_page <- venue_data1[["page"]][["totalPages"]]  # page number 238
+
+for (p in first_page:(last_page-1)){
+  
+  all_ger_venue_response <-
+    GET(
+      "https://app.ticketmaster.com/discovery/v2/venues?",
+      query = list(countryCode = "DE",
+                   page = as.character(p),
+                   locale = "*",
+                   # The locale in ISO code format. Multiple comma-separated values can be provided. 
+                   # When omitting the country part of the code (e.g. only 'en' or 'fr') then the first matching locale is used. 
+                   # When using a '*' it matches all locales. '*' can only be used at the end (e.g. 'en-us,en,*')
+                   apikey = ticketmaster_key)
+    )
+  
+  # extract content and transform JSON to R List 
+  venue_data2 <- jsonlite::fromJSON(content(all_ger_venue_response, as = "text"))
+  
+  # create parsed data frame 
+  venue_data2_parsed <- venue_data2[["_embedded"]][["venues"]]
+  
+  df2 <- lapply(1:nrow(venue_data2_parsed), function(i) {
+    df <- venue_data2_parsed[i,]
+    
+    data.frame(
+      name = ifelse("name" %in% names(df) == TRUE, df$name, NA),  # check whether a name exists within nested list 
+      city = df$city$name,
+      postalCode = df$postalCode,
+      address = ifelse("address" %in% names(df) == TRUE, df$address$line1, NA),  # check whether an address exists within nested list 
+      url = ifelse("url" %in% names(df) == TRUE, df$url, NA),
+      long = ifelse("location" %in% names(df) == TRUE, as.double(df$location$longitude), NA),
+      lat = ifelse("location" %in% names(df) == TRUE, as.double(df$location$latitude), NA),
+      stringsAsFactors = FALSE
+    )
+  })
+  
+  # data frame after each page 
+  df_venue_data2_working <- do.call(rbind, df2)
+  
+  df_venue_data2 <- rbind(df_venue_data2, df_venue_data2_working)
+  
+  
+  # limit of 5 requests per second 
+  Sys.sleep(1)
+  
+  print(paste0("loop: ", as.character(p)))
+}
+```
+
+
+```{r}
+```
+
