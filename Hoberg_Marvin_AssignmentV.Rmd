@@ -185,7 +185,43 @@ removables <- anti_join(GER_duplicates, c)
 # remove all removable duplicates from the original data set
 tidy_data <- anti_join(df_venue_data2, removables)
 
+# remove aiding variables
+remove(a, b, c)
+
 # check whether any duplicates are left 
 janitor::get_dupes(tidy_data, "name", "address", "city", "postalCode", "long")
+
+# check the required data structure
+glimpse(tidy_data)
+```
+
+```{r map German venues, message=FALSE}
+GER_max_long <- 15.043611
+GER_min_long <- 5.866944
+GER_max_lat <- 55.0846
+GER_min_lat <-47.271679
+
+GER_geo_opt <- tidy_data[between(tidy_data$long, GER_min_long, GER_max_long)&
+                           between(tidy_data$lat, GER_min_lat, GER_max_lat), ] 
+
+ggplot() +
+  geom_polygon(
+    aes(x = long, 
+        y = lat, 
+        group = group),
+    data = map_data("world", 
+                    region = "Germany"),
+    fill = "grey90",
+    color = "black"
+  ) +
+  # event location points
+  geom_point(aes(x = long, y = lat),
+    data = GER_geo_opt, color = "mediumpurple", size = 0.3) +
+  theme_void() + 
+  coord_quickmap() +
+  labs(title = "Event locations across Germany", 
+       caption = "Source: ticketmaster.com") +
+  theme(title = element_text(size = 8, face = 'bold'),
+        plot.caption = element_text(face = "italic"))
 ```
 
