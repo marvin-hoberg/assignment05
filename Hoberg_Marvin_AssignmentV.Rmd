@@ -19,12 +19,17 @@ rm(list = ls())  # clear environment
 ```
 
 ```{r packages, message=FALSE}
-# load all necessary packages 
-if (!require("jsonlite")) install.packages("jsonlite")
-if (!require("httr")) install.packages("httr")
-if (!require("rlist")) install.packages("rlist")
-if (!require("tidyverse")) install.packages("tidyverse")
-if (!require("plyr")) install.packages("plyr")
+# load all necessary packages
+if (!require("jsonlite"))
+  install.packages("jsonlite")
+if (!require("httr"))
+  install.packages("httr")
+if (!require("rlist"))
+  install.packages("rlist")
+if (!require("tidyverse"))
+  install.packages("tidyverse")
+if (!require("plyr"))
+  install.packages("plyr")
 
 library(jsonlite)
 library(httr)
@@ -34,42 +39,55 @@ library(plyr)
 ```
 
 ```{r API, message=FALSE}
-# respective API key is stored in secret file. Might be changed by user. 
-# source file 
+# respective API key is stored in secret file. Might be changed by user.
+# source file
 source("ticketmaster_key.R")
 
-# first get command 
+# first get command
 ger_venue_response <-
   GET(
     "https://app.ticketmaster.com/discovery/v2/venues?",
-    query = list(countryCode = "DE",
-                 locale = "*",
-                 # The locale in ISO code format. Multiple comma-separated values can be provided. 
-                 # When omitting the country part of the code (e.g. only 'en' or 'fr') 
-                 # then the first matching locale is used. 
-                 # When using a '*' it matches all locales. '*' can only be used at the end (e.g.'en-us,en,*')
-                 apikey = ticketmaster_key)
+    query = list(
+      countryCode = "DE",
+      locale = "*",
+      # The locale in ISO code format. Multiple comma-separated values can be provided.
+      # When omitting the country part of the code (e.g. only 'en' or 'fr')
+      # then the first matching locale is used.
+      # When using a '*' it matches all locales. '*' can only be used at the end (e.g.'en-us,en,*')
+      apikey = ticketmaster_key
+    )
   )
 
-# extract content and transform JSON to R List 
-venue_data1 <- jsonlite::fromJSON(content(ger_venue_response, as = "text"))
-# or use: content(ger_venue_response, as = "text") 
+# extract content and transform JSON to R List
+venue_data1 <-
+  jsonlite::fromJSON(content(ger_venue_response, as = "text"))
+# or use: content(ger_venue_response, as = "text")
 # but caution: this might lead to an error
 
 # create parsed data frame 
 venue_data1_parsed <- venue_data1[["_embedded"]][["venues"]]
 
 df1 <- lapply(1:nrow(venue_data1_parsed), function(i) {
-  df <- venue_data1_parsed[i,]
+  df <- venue_data1_parsed[i, ]
   
+  # check whether feature exists within df and add value if TRUE, else add NA
+  # ensure that all features exist across whole data frame
   data.frame(
-    name = ifelse("name" %in% names(df) == TRUE, df$name, NA),  # check whether a name exists within nested list 
-    city = df$city$name,
-    postalCode = df$postalCode,
-    address = ifelse("address" %in% names(df) == TRUE, df$address$line1, NA),  # check whether an address exists within nested list 
-    url = df$url,
-    long = as.double(df$location$longitude),
-    lat = as.double(df$location$latitude),
+    name = ifelse("name" %in% names(df) == TRUE, df$name, NA),
+    city = ifelse("city" %in% names(df) == TRUE, df$city$name, NA),
+    postalCode = ifelse("postalCode" %in% names(df) == TRUE, df$postalCode, NA),
+    address = ifelse("address" %in% names(df) == TRUE, df$address$line1, NA),
+    url = ifelse("url" %in% names(df) == TRUE, df$url, NA),
+    long = ifelse(
+      "location" %in% names(df) == TRUE,
+      as.double(df$location$longitude),
+      NA
+    ),
+    lat = ifelse(
+      "location" %in% names(df) == TRUE,
+      as.double(df$location$latitude),
+      NA
+    ),
     stringsAsFactors = FALSE
   )
 })
@@ -81,10 +99,8 @@ glimpse(df_venue_data1)
 ```
 
 ```{r advanced venue search, message=FALSE}
-# empty data frame for computational speed
-#n <- venue_data1[["page"]][["totalElements"]]
-
-df_venue_data2 <- 
+# initialize empty data frame 
+df_venue_data2 <-
   data.frame(
     name = character(),
     city = character(),
@@ -94,92 +110,110 @@ df_venue_data2 <-
     long = double(),
     lat = double(),
     stringsAsFactors = FALSE
-)
+  )
 
 
-# get large data set with all German venues 
-first_page <- venue_data1[["page"]][["number"]]  # page number 0 
-last_page <- venue_data1[["page"]][["totalPages"]]  # page number 629
+# get large data set with all German venues
+first_page <- 
+  venue_data1[["page"]][["number"]]  # first page number 
+last_page <-
+  venue_data1[["page"]][["totalPages"]]  # last page number 
 
-for (p in first_page:(last_page-1)){
-  
+for (p in first_page:(last_page - 1)) {
   all_ger_venue_response <-
     GET(
       "https://app.ticketmaster.com/discovery/v2/venues?",
-      query = list(countryCode = "DE",
-                   page = as.character(p),
-                   locale = "*",
-                   # The locale in ISO code format. Multiple comma-separated values can be provided. 
-                   # When omitting the country part of the code (e.g. only 'en' or 'fr') then the first matching locale is used. 
-                   # When using a '*' it matches all locales. '*' can only be used at the end (e.g. 'en-us,en,*')
-                   apikey = ticketmaster_key)
+      query = list(
+        countryCode = "DE",
+        page = as.character(p),
+        locale = "*",
+        # The locale in ISO code format. Multiple comma-separated values can be provided.
+        # When omitting the country part of the code (e.g. only 'en' or 'fr') then the first matching locale is used.
+        # When using a '*' it matches all locales. '*' can only be used at the end (e.g. 'en-us,en,*')
+        apikey = ticketmaster_key
+      )
     )
   
-  # extract content and transform JSON to R List 
-  venue_data2 <- jsonlite::fromJSON(content(all_ger_venue_response, as = "text"))
+  # extract content and transform JSON to R List
+  venue_data2 <-
+    jsonlite::fromJSON(content(all_ger_venue_response, as = "text"))
   
-  # create parsed data frame 
+  # create parsed data frame
   venue_data2_parsed <- venue_data2[["_embedded"]][["venues"]]
   
   df2 <- lapply(1:nrow(venue_data2_parsed), function(i) {
     df <- venue_data2_parsed[i,]
     
+    # check whether feature exists within df and add value if TRUE, else add NA
+    # ensure that all features exist across whole data frame 
     data.frame(
-      name = ifelse("name" %in% names(df) == TRUE, df$name, NA),  
-      # check whether a name exists within nested list 
-      city = df$city$name,
-      postalCode = df$postalCode,
-      address = ifelse("address" %in% names(df) == TRUE, df$address$line1, NA),  
-      # check whether an address exists within nested list 
+      name = ifelse("name" %in% names(df) == TRUE, df$name, NA),
+      city = ifelse("city" %in% names(df) == TRUE, df$city$name, NA),
+      postalCode = ifelse("postalCode" %in% names(df) == TRUE, df$postalCode, NA),
+      address = ifelse("address" %in% names(df) == TRUE, df$address$line1, NA),
       url = ifelse("url" %in% names(df) == TRUE, df$url, NA),
-      long = ifelse("location" %in% names(df) == TRUE, as.double(df$location$longitude), NA),
-      lat = ifelse("location" %in% names(df) == TRUE, as.double(df$location$latitude), NA),
+      long = ifelse(
+        "location" %in% names(df) == TRUE,
+        as.double(df$location$longitude),
+        NA
+      ),
+      lat = ifelse(
+        "location" %in% names(df) == TRUE,
+        as.double(df$location$latitude),
+        NA
+      ),
       stringsAsFactors = FALSE
     )
   })
   
-  # data frame after each page 
+  # recombine data frame after each page 
   df_venue_data2_working <- do.call(rbind, df2)
   
   df_venue_data2 <- rbind(df_venue_data2, df_venue_data2_working)
   
-  # limit of 5 requests per second 
+  # limit of 5 requests per second
   Sys.sleep(0.8)
   
   print(paste0("loop: ", as.character(p)))
 }
 
-save(df_venue_data2, file="GER_venues.Rda")
+# save downloaded data
+save(df_venue_data2, file = "GER_venues.Rda")
 ```
 
 ```{r tidy data, message=FALSE}
-# get all duplicate observations in data frame 
-GER_duplicates <- janitor::get_dupes(df_venue_data2, "name", "address", "city", "postalCode")
+# load downloaded data into working environment 
+load("GER_venues.Rda")
+
+# get all duplicate observations in data frame
+GER_duplicates <-
+  janitor::get_dupes(df_venue_data2, "name", "address", "city", "postalCode")
 
 # get duplicates where location information is identical
-# we can omit the duplicates without loosing information about the location 
-easy_removables <- GER_duplicates[duplicated(GER_duplicates$lat, GER_duplicates$long), ]
+# we can omit the duplicates without loosing information about the location
+easy_removables <-
+  GER_duplicates[duplicated(GER_duplicates$lat, GER_duplicates$long),]
 
-# removing duplicates results is a new data set which contains some duplicates 
+# removing duplicates results is a new data set which contains some duplicates
 # where the location information differs or contains NAs
 a <- anti_join(GER_duplicates, easy_removables)
 
-# search the new data set for observations where some location feature 
+# search the new data set for observations where some location feature
 # contains NA values (i.e., no location information)
-b <- a[a$long %in% NA, ]
+b <- a[a$long %in% NA,]
 
-# remove duplicates results in a data set with unique observations where 
+# remove duplicates results in a data set with unique observations where
 # location information is missing
-# we can omit the duplicates without loosing information about the location 
-b <- b[!duplicated(b$name), ]
+# we can omit the duplicates without loosing information about the location
+b <- b[!duplicated(b$name),]
 
-# removing duplicates results is a new data set which contains observations 
-# with unique location information 
-# the resulting data frame contains all duplicates we like to keep (!) in our 
+# removing duplicates results is a new data set which contains observations
+# with unique location information
+# the resulting data frame contains all duplicates we like to keep (!) in our
 # original data frame
-c <- anti_join(a,b)
+c <- anti_join(a, b)
 
-# create a data frame which contains all duplicates we like to drop 
+# create a data frame which contains all duplicates we like to drop
 removables <- anti_join(GER_duplicates, c)
 
 # remove all removable duplicates from the original data set
@@ -188,7 +222,7 @@ tidy_data <- anti_join(df_venue_data2, removables)
 # remove aiding variables
 remove(a, b, c)
 
-# check whether any duplicates are left 
+# check whether any duplicates are left
 janitor::get_dupes(tidy_data, "name", "address", "city", "postalCode", "long")
 
 # check the required data structure
@@ -196,30 +230,38 @@ glimpse(tidy_data)
 ```
 
 ```{r map German venues, message=FALSE}
+# define boundaries of German location data
 GER_max_long <- 15.043611
 GER_min_long <- 5.866944
 GER_max_lat <- 55.0846
-GER_min_lat <-47.271679
+GER_min_lat <- 47.271679
 
-GER_geo_opt <- tidy_data[between(tidy_data$long, GER_min_long, GER_max_long)&
-                           between(tidy_data$lat, GER_min_lat, GER_max_lat), ] 
+# exclude location points that lie outside boundaries
+GER_geo_opt <-
+  tidy_data[between(tidy_data$long, GER_min_long, GER_max_long) &
+              between(tidy_data$lat, GER_min_lat, GER_max_lat),]
 
 ggplot() +
   geom_polygon(
-    aes(x = long, 
-        y = lat, 
+    aes(x = long,
+        y = lat,
         group = group),
-    data = map_data("world", 
+    data = map_data("world",
                     region = "Germany"),
     fill = "grey90",
     color = "black"
   ) +
-  # event location points
-  geom_point(aes(x = long, y = lat),
-    data = GER_geo_opt, color = "mediumpurple", size = 0.3) +
-  theme_void() + 
+  # add venue location points to map
+  geom_point(
+    aes(x = long, y = lat),
+    data = GER_geo_opt,
+    color = "mediumpurple",
+    size = 0.3,
+    alpha = 0.5
+  ) +
+  theme_void() +
   coord_quickmap() +
-  labs(title = "Event locations across Germany", 
+  labs(title = "Event locations across Germany",
        caption = "Source: ticketmaster.com") +
   theme(title = element_text(size = 8, face = 'bold'),
         plot.caption = element_text(face = "italic"))
