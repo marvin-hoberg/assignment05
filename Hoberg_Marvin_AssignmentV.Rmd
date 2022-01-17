@@ -1,6 +1,6 @@
 ---
 title: "Assignment 05"
-author: 'Marvin Hoberg'
+author: "Marvin Hoberg, https://github.com/marvin-hoberg/assignment05"
 date: "1/10/2022"
 output: 
   html_document:
@@ -9,6 +9,9 @@ output:
 ---
 
 ## Code of conduct 
+
+Regarding some tasks of this assignment I have partly worked with Jan Jacobsen. 
+Apart from the fact that there have been some discussions and exchange of ideas,
 I hereby declare that this is solely my own work and my own code.
 
 ```{r setup, include=FALSE, message=FALSE}
@@ -100,7 +103,7 @@ df_venue_data1 <- do.call(rbind, df1)
 glimpse(df_venue_data1)
 ```
 
-```{r GER advanced venue search, message=FALSE}
+```{r GER advanced venue search, message=FALSE, eval=FALSE}
 # initialize empty data frame 
 df_venue_data2 <-
   data.frame(
@@ -176,7 +179,7 @@ for (p in first_page:(last_page - 1)) {
   # limit of 5 requests per second
   Sys.sleep(0.8)
   
-  print(paste0("loop: ", as.character(p)))
+  # print(paste0("loop: ", as.character(p)))
 }
 
 # save downloaded data
@@ -222,7 +225,7 @@ removables <- anti_join(GER_duplicates, c)
 tidy_data <- anti_join(df_venue_data2, removables)
 
 # remove aiding variables
-remove(a, b, c)
+remove(a, b, c, easy_removables, removables)
 
 # check whether any duplicates are left
 janitor::get_dupes(tidy_data, "name", "address", "city", "postalCode", "long")
@@ -231,12 +234,12 @@ janitor::get_dupes(tidy_data, "name", "address", "city", "postalCode", "long")
 glimpse(tidy_data)
 ```
 
-```{r map German venues, message=FALSE}
+```{r map German venues, message=FALSE, warning=FALSE}
 # define boundaries of German location data
-GER_max_long <- 15.043611
-GER_min_long <- 5.866944
-GER_max_lat <- 55.0846
-GER_min_lat <- 47.271679
+GER_max_lat <- 55.0846  # northernmost point 
+GER_min_lat <- 47.271679  # southernmost point 
+GER_max_long <- 15.043611  # easternmost point 
+GER_min_long <- 5.866944  # westernmost point 
 
 # exclude location points that lie outside boundaries
 GER_geo_opt <-
@@ -257,7 +260,7 @@ ggplot() +
   geom_point(
     aes(x = long, y = lat),
     data = GER_geo_opt,
-    color = "mediumpurple",
+    color = "forestgreen",
     size = 0.3,
     alpha = 0.5
   ) +
@@ -268,6 +271,7 @@ ggplot() +
   theme(title = element_text(size = 8, face = 'bold'),
         plot.caption = element_text(face = "italic"))
 ```
+
 ## Austrian venues 
 
 ```{r AT API, message=FALSE}
@@ -326,7 +330,7 @@ AT_df_venue_data1 <- do.call(rbind, df1)
 glimpse(AT_df_venue_data1)
 ```
 
-```{r AT advanced venue search, message=FALSE}
+```{r AT advanced venue search, message=FALSE, eval=FALSE}
 # initialize empty data frame 
 AT_df_venue_data2 <-
   data.frame(
@@ -355,9 +359,10 @@ for (p in first_page:(last_page - 1)) {
         countryCode = "AT",
         page = as.character(p),
         locale = "*",
-        # The locale in ISO code format. Multiple comma-separated values can be provided.
-        # When omitting the country part of the code (e.g. only 'en' or 'fr') then the first matching locale is used.
-        # When using a '*' it matches all locales. '*' can only be used at the end (e.g. 'en-us,en,*')
+      # The locale in ISO code format. Multiple comma-separated values can be provided.
+      # When omitting the country part of the code (e.g. only 'en' or 'fr')
+      # then the first matching locale is used.
+      # When using a '*' it matches all locales. '*' can only be used at the end (e.g.'en-us,en,*')
         apikey = ticketmaster_key
       )
     )
@@ -402,7 +407,7 @@ for (p in first_page:(last_page - 1)) {
   # limit of 5 requests per second
   Sys.sleep(0.8)
   
-  print(paste0("loop: ", as.character(p)))
+  # print(paste0("loop: ", as.character(p)))
 }
 
 # save downloaded data
@@ -448,7 +453,7 @@ removables <- anti_join(AT_duplicates, c)
 AT_tidy_data <- anti_join(AT_df_venue_data2, removables)
 
 # remove aiding variables
-remove(a, b, c)
+remove(a, b, c, easy_removables, removables)
 
 # check whether any duplicates are left
 janitor::get_dupes(AT_tidy_data, "name", "address", "city", "postalCode", "long")
@@ -457,7 +462,7 @@ janitor::get_dupes(AT_tidy_data, "name", "address", "city", "postalCode", "long"
 glimpse(AT_tidy_data)
 ```
 
-```{r map Austrian venues, message=FALSE}
+```{r map Austrian venues, message=FALSE, warning=FALSE}
 # define boundaries of Austrian location data
 AT_max_lat <- 49.020556  # northernmost latitude
 AT_min_lat <- 46.3725  # southernmost latitude
@@ -483,7 +488,7 @@ ggplot() +
   geom_point(
     aes(x = long, y = lat),
     data = AT_geo_opt,
-    color = "darkred",
+    color = "firebrick",
     size = 0.3,
     alpha = 0.5
   ) +
