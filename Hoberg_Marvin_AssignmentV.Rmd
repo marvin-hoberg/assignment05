@@ -1,6 +1,6 @@
 ---
 title: "Assignment 05"
-author: 'Marvin Hoberg'
+author: "Marvin Hoberg, https://github.com/marvin-hoberg/assignment05"
 date: "1/10/2022"
 output: 
   html_document:
@@ -9,6 +9,9 @@ output:
 ---
 
 ## Code of conduct 
+
+Regarding some tasks of this assignment I have partly worked with Jan Jacobsen. 
+Apart from the fact that there have been some discussions and exchange of ideas,
 I hereby declare that this is solely my own work and my own code.
 
 ```{r setup, include=FALSE, message=FALSE}
@@ -18,3 +21,498 @@ knitr::opts_knit$set(root.dir = "~/Coding/R_Programming/DSPM/assignment05")
 rm(list = ls())  # clear environment 
 ```
 
+```{r packages, message=FALSE}
+# load all necessary packages
+if (!require("jsonlite"))
+  install.packages("jsonlite")
+if (!require("httr"))
+  install.packages("httr")
+if (!require("rlist"))
+  install.packages("rlist")
+if (!require("tidyverse"))
+  install.packages("tidyverse")
+if (!require("plyr"))
+  install.packages("plyr")
+
+library(jsonlite)
+library(httr)
+library(rlist)
+library(tidyverse)
+library(plyr)
+```
+
+## German venues 
+
+In a first step, I make a GET request from the ticketmaster API which responds 
+the first page of German venues. 
+
+```{r GER API, message=FALSE}
+# respective API key is stored in secret file. Might be changed by user.
+# source file
+source("ticketmaster_key.R")
+
+# first get command
+GER_venue_response <-
+  GET(
+    "https://app.ticketmaster.com/discovery/v2/venues?",
+    query = list(
+      countryCode = "DE",
+      locale = "*",
+      # The locale in ISO code format. Multiple comma-separated values can be provided.
+      # When omitting the country part of the code (e.g. only 'en' or 'fr')
+      # then the first matching locale is used.
+      # When using a '*' it matches all locales. '*' can only be used at the end (e.g.'en-us,en,*')
+      apikey = ticketmaster_key
+    )
+  )
+
+# extract content and transform JSON to R List
+venue_data1 <-
+  jsonlite::fromJSON(content(GER_venue_response, as = "text"))
+# or use: content(GER_venue_response, as = "text")
+# but caution: this might lead to an error
+
+# create parsed data frame 
+venue_data1_parsed <- venue_data1[["_embedded"]][["venues"]]
+
+df1 <- lapply(1:nrow(venue_data1_parsed), function(i) {
+  df <- venue_data1_parsed[i, ]
+  
+  # check whether feature exists within df and add value if TRUE, else add NA
+  # ensure that all features exist across whole data frame
+  data.frame(
+    name = ifelse("name" %in% names(df) == TRUE, df$name, NA),
+    city = ifelse("city" %in% names(df) == TRUE, df$city$name, NA),
+    postalCode = ifelse("postalCode" %in% names(df) == TRUE, df$postalCode, NA),
+    address = ifelse("address" %in% names(df) == TRUE, df$address$line1, NA),
+    url = ifelse("url" %in% names(df) == TRUE, df$url, NA),
+    long = ifelse(
+      "location" %in% names(df) == TRUE,
+      as.double(df$location$longitude),
+      NA
+    ),
+    lat = ifelse(
+      "location" %in% names(df) == TRUE,
+      as.double(df$location$latitude),
+      NA
+    ),
+    stringsAsFactors = FALSE
+  )
+})
+
+df_venue_data1 <- do.call(rbind, df1)
+
+# check the required data structure
+glimpse(df_venue_data1)
+```
+
+In a second step, I make use of the meta data and interate over each page in 
+order to get all German venueas from ticketmaste.com. 
+
+```{r GER advanced venue search, message=FALSE, eval=FALSE}
+# initialize empty data frame 
+df_venue_data2 <-
+  data.frame(
+    name = character(),
+    city = character(),
+    postalCode = character(),
+    address = character(),
+    url = character(),
+    long = double(),
+    lat = double(),
+    stringsAsFactors = FALSE
+  )
+
+
+# get large data set with all German venues
+first_page <- 
+  venue_data1[["page"]][["number"]]  # first page number 
+last_page <-
+  venue_data1[["page"]][["totalPages"]]  # last page number 
+
+for (p in first_page:(last_page - 1)) {
+  all_ger_venue_response <-
+    GET(
+      "https://app.ticketmaster.com/discovery/v2/venues?",
+      query = list(
+        countryCode = "DE",
+        page = as.character(p),
+        locale = "*",
+        # The locale in ISO code format. Multiple comma-separated values can be provided.
+        # When omitting the country part of the code (e.g. only 'en' or 'fr') then the first matching locale is used.
+        # When using a '*' it matches all locales. '*' can only be used at the end (e.g. 'en-us,en,*')
+        apikey = ticketmaster_key
+      )
+    )
+  
+  # extract content and transform JSON to R List
+  venue_data2 <-
+    jsonlite::fromJSON(content(all_ger_venue_response, as = "text"))
+  
+  # create parsed data frame
+  venue_data2_parsed <- venue_data2[["_embedded"]][["venues"]]
+  
+  df2 <- lapply(1:nrow(venue_data2_parsed), function(i) {
+    df <- venue_data2_parsed[i,]
+    
+    # check whether feature exists within df and add value if TRUE, else add NA
+    # ensure that all features exist across whole data frame 
+    data.frame(
+      name = ifelse("name" %in% names(df) == TRUE, df$name, NA),
+      city = ifelse("city" %in% names(df) == TRUE, df$city$name, NA),
+      postalCode = ifelse("postalCode" %in% names(df) == TRUE, df$postalCode, NA),
+      address = ifelse("address" %in% names(df) == TRUE, df$address$line1, NA),
+      url = ifelse("url" %in% names(df) == TRUE, df$url, NA),
+      long = ifelse(
+        "location" %in% names(df) == TRUE,
+        as.double(df$location$longitude),
+        NA
+      ),
+      lat = ifelse(
+        "location" %in% names(df) == TRUE,
+        as.double(df$location$latitude),
+        NA
+      ),
+      stringsAsFactors = FALSE
+    )
+  })
+  
+  # recombine data frame after each page 
+  df_venue_data2_working <- do.call(rbind, df2)
+  
+  df_venue_data2 <- rbind(df_venue_data2, df_venue_data2_working)
+  
+  # limit of 5 requests per second
+  # set limit slightly higher since I receive spike errors 
+  Sys.sleep(0.8)
+  
+  # print(paste0("loop: ", as.character(p)))
+}
+
+# save downloaded data
+save(df_venue_data2, file = "GER_venues.Rda")
+```
+
+Since I store the downloaded data since I do not want to request the data each 
+time I run the script.
+
+Next, I remove some duplicates from the data frame. 
+
+```{r GER tidy data, message=FALSE}
+# load downloaded data into working environment 
+load("GER_venues.Rda")
+
+# get all duplicate observations in data frame
+GER_duplicates <-
+  janitor::get_dupes(df_venue_data2, "name", "address", "city", "postalCode")
+
+# get duplicates where location information is identical
+# we can omit the duplicates without loosing information about the location
+easy_removables <-
+  GER_duplicates[duplicated(GER_duplicates$lat, GER_duplicates$long),]
+
+# removing duplicates results is a new data set which contains some duplicates
+# where the location information differs or contains NAs
+a <- anti_join(GER_duplicates, easy_removables)
+
+# search the new data set for observations where some location feature
+# contains NA values (i.e., no location information)
+b <- a[a$long %in% NA,]
+
+# remove duplicates results in a data set with unique observations where
+# location information is missing
+# we can omit the duplicates without loosing information about the location
+b <- b[!duplicated(b$name),]
+
+# removing duplicates results is a new data set which contains observations
+# with unique location information
+# the resulting data frame contains all duplicates we like to keep (!) in our
+# original data frame
+c <- anti_join(a, b)
+
+# create a data frame which contains all duplicates we like to drop
+removables <- anti_join(GER_duplicates, c)
+
+# remove all removable duplicates from the original data set
+tidy_data <- anti_join(df_venue_data2, removables)
+
+# remove aiding variables
+remove(a, b, c, easy_removables, removables)
+
+# check whether any duplicates are left
+janitor::get_dupes(tidy_data, "name", "address", "city", "postalCode", "long")
+
+# check the required data structure
+glimpse(tidy_data)
+```
+
+Finally, I map the German venues and set some location boundaries to ensure that 
+only venues within German borders are included. 
+
+```{r map German venues, message=FALSE, warning=FALSE}
+# define boundaries of German location data
+GER_max_lat <- 55.0846  # northernmost point 
+GER_min_lat <- 47.271679  # southernmost point 
+GER_max_long <- 15.043611  # easternmost point 
+GER_min_long <- 5.866944  # westernmost point 
+
+# exclude location points that lie outside boundaries
+GER_geo_opt <-
+  tidy_data[between(tidy_data$long, GER_min_long, GER_max_long) &
+              between(tidy_data$lat, GER_min_lat, GER_max_lat),]
+
+ggplot() +
+  geom_polygon(
+    aes(x = long,
+        y = lat,
+        group = group),
+    data = map_data("world",
+                    region = "Germany"),
+    fill = "grey90",
+    color = "black"
+  ) +
+  # add venue location points to map
+  geom_point(
+    aes(x = long, y = lat),
+    data = GER_geo_opt,
+    color = "forestgreen",
+    size = 0.3,
+    alpha = 0.5
+  ) +
+  theme_void() +
+  coord_quickmap() +
+  labs(title = "Event locations across Germany",
+       caption = "Source: ticketmaster.com") +
+  theme(title = element_text(size = 8, face = 'bold'),
+        plot.caption = element_text(face = "italic"))
+```
+
+## Austrian venues 
+
+I repeat the same steps as above for Austria. 
+
+```{r AT API, message=FALSE}
+# first get command for Austria 
+AT_venue_response <-
+  GET(
+    "https://app.ticketmaster.com/discovery/v2/venues?",
+    query = list(
+      countryCode = "AT",
+      locale = "*",
+      # The locale in ISO code format. Multiple comma-separated values can be provided.
+      # When omitting the country part of the code (e.g. only 'en' or 'fr')
+      # then the first matching locale is used.
+      # When using a '*' it matches all locales. '*' can only be used at the end (e.g.'en-us,en,*')
+      apikey = ticketmaster_key
+    )
+  )
+
+# extract content and transform JSON to R List
+AT_venue_data1 <-
+  jsonlite::fromJSON(content(AT_venue_response, as = "text"))
+# or use: content(GER_venue_response, as = "text")
+# but caution: this might lead to an error
+
+# create parsed data frame 
+AT_venue_data1_parsed <- AT_venue_data1[["_embedded"]][["venues"]]
+
+df1 <- lapply(1:nrow(AT_venue_data1_parsed), function(i) {
+  df <- AT_venue_data1_parsed[i, ]
+  
+  # check whether feature exists within df and add value if TRUE, else add NA
+  # ensure that all features exist across whole data frame
+  data.frame(
+    name = ifelse("name" %in% names(df) == TRUE, df$name, NA),
+    city = ifelse("city" %in% names(df) == TRUE, df$city$name, NA),
+    postalCode = ifelse("postalCode" %in% names(df) == TRUE, df$postalCode, NA),
+    address = ifelse("address" %in% names(df) == TRUE, df$address$line1, NA),
+    url = ifelse("url" %in% names(df) == TRUE, df$url, NA),
+    long = ifelse(
+      "location" %in% names(df) == TRUE,
+      as.double(df$location$longitude),
+      NA
+    ),
+    lat = ifelse(
+      "location" %in% names(df) == TRUE,
+      as.double(df$location$latitude),
+      NA
+    ),
+    stringsAsFactors = FALSE
+  )
+})
+
+AT_df_venue_data1 <- do.call(rbind, df1)
+
+# check the required data structure
+glimpse(AT_df_venue_data1)
+```
+
+```{r AT advanced venue search, message=FALSE, eval=FALSE}
+# initialize empty data frame 
+AT_df_venue_data2 <-
+  data.frame(
+    name = character(),
+    city = character(),
+    postalCode = character(),
+    address = character(),
+    url = character(),
+    long = double(),
+    lat = double(),
+    stringsAsFactors = FALSE
+  )
+
+
+# get large data set with all German venues
+first_page <- 
+  AT_venue_data1[["page"]][["number"]]  # first page number 
+last_page <-
+  AT_venue_data1[["page"]][["totalPages"]]  # last page number 
+
+for (p in first_page:(last_page - 1)) {
+  all_AT_venue_response <-
+    GET(
+      "https://app.ticketmaster.com/discovery/v2/venues?",
+      query = list(
+        countryCode = "AT",
+        page = as.character(p),
+        locale = "*",
+      # The locale in ISO code format. Multiple comma-separated values can be provided.
+      # When omitting the country part of the code (e.g. only 'en' or 'fr')
+      # then the first matching locale is used.
+      # When using a '*' it matches all locales. '*' can only be used at the end (e.g.'en-us,en,*')
+        apikey = ticketmaster_key
+      )
+    )
+  
+  # extract content and transform JSON to R List
+  AT_venue_data2 <-
+    jsonlite::fromJSON(content(all_AT_venue_response, as = "text"))
+  
+  # create parsed data frame
+  AT_venue_data2_parsed <- AT_venue_data2[["_embedded"]][["venues"]]
+  
+  df2 <- lapply(1:nrow(AT_venue_data2_parsed), function(i) {
+    df <- AT_venue_data2_parsed[i,]
+    
+    # check whether feature exists within df and add value if TRUE, else add NA
+    # ensure that all features exist across whole data frame 
+    data.frame(
+      name = ifelse("name" %in% names(df) == TRUE, df$name, NA),
+      city = ifelse("city" %in% names(df) == TRUE, df$city$name, NA),
+      postalCode = ifelse("postalCode" %in% names(df) == TRUE, df$postalCode, NA),
+      address = ifelse("address" %in% names(df) == TRUE, df$address$line1, NA),
+      url = ifelse("url" %in% names(df) == TRUE, df$url, NA),
+      long = ifelse(
+        "location" %in% names(df) == TRUE,
+        as.double(df$location$longitude),
+        NA
+      ),
+      lat = ifelse(
+        "location" %in% names(df) == TRUE,
+        as.double(df$location$latitude),
+        NA
+      ),
+      stringsAsFactors = FALSE
+    )
+  })
+  
+  # recombine data frame after each page 
+  AT_df_venue_data2_working <- do.call(rbind, df2)
+  
+  AT_df_venue_data2 <- rbind(AT_df_venue_data2, AT_df_venue_data2_working)
+  
+  # limit of 5 requests per second
+  Sys.sleep(0.8)
+  
+  # print(paste0("loop: ", as.character(p)))
+}
+
+# save downloaded data
+save(AT_df_venue_data2, file = "AT_venues.Rda")
+```
+
+```{r AT tidy data, message=FALSE}
+# load downloaded data into working environment 
+load("AT_venues.Rda")
+
+# get all duplicate observations in data frame
+AT_duplicates <-
+  janitor::get_dupes(AT_df_venue_data2, "name", "address", "city", "postalCode")
+
+# get duplicates where location information is identical
+# we can omit the duplicates without loosing information about the location
+easy_removables <-
+  AT_duplicates[duplicated(AT_duplicates$lat, AT_duplicates$long),]
+
+# removing duplicates results is a new data set which contains some duplicates
+# where the location information differs or contains NAs
+a <- anti_join(AT_duplicates, easy_removables)
+
+# search the new data set for observations where some location feature
+# contains NA values (i.e., no location information)
+b <- a[a$long %in% NA,]
+
+# remove duplicates results in a data set with unique observations where
+# location information is missing
+# we can omit the duplicates without loosing information about the location
+b <- b[!duplicated(b$name),]
+
+# removing duplicates results is a new data set which contains observations
+# with unique location information
+# the resulting data frame contains all duplicates we like to keep (!) in our
+# original data frame
+c <- anti_join(a, b)
+
+# create a data frame which contains all duplicates we like to drop
+removables <- anti_join(AT_duplicates, c)
+
+# remove all removable duplicates from the original data set
+AT_tidy_data <- anti_join(AT_df_venue_data2, removables)
+
+# remove aiding variables
+remove(a, b, c, easy_removables, removables)
+
+# check whether any duplicates are left
+janitor::get_dupes(AT_tidy_data, "name", "address", "city", "postalCode", "long")
+
+# check the required data structure
+glimpse(AT_tidy_data)
+```
+
+```{r map Austrian venues, message=FALSE, warning=FALSE}
+# define boundaries of Austrian location data
+AT_max_lat <- 49.020556  # northernmost latitude
+AT_min_lat <- 46.3725  # southernmost latitude
+AT_max_long <- 17.109167  # easternmost longitude
+AT_min_long <- 9.530833  # westernmost longitude
+
+# exclude location points that lie outside boundaries
+AT_geo_opt <-
+  AT_tidy_data[between(AT_tidy_data$long, AT_min_long, AT_max_long) &
+              between(AT_tidy_data$lat, AT_min_lat, AT_max_lat),]
+
+ggplot() +
+  geom_polygon(
+    aes(x = long,
+        y = lat,
+        group = group),
+    data = map_data("world",
+                    region = "Austria"),
+    fill = "grey90",
+    color = "black"
+  ) +
+  # add venue location points to map
+  geom_point(
+    aes(x = long, y = lat),
+    data = AT_geo_opt,
+    color = "firebrick",
+    size = 0.3,
+    alpha = 0.5
+  ) +
+  theme_void() +
+  coord_quickmap() +
+  labs(title = "Event locations across Austria",
+       caption = "Source: ticketmaster.com") +
+  theme(title = element_text(size = 8, face = 'bold'),
+        plot.caption = element_text(face = "italic"))
+```
