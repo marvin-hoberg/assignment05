@@ -43,6 +43,9 @@ library(plyr)
 
 ## German venues 
 
+In a first step, I make a GET request from the ticketmaster API which responds 
+the first page of German venues. 
+
 ```{r GER API, message=FALSE}
 # respective API key is stored in secret file. Might be changed by user.
 # source file
@@ -102,6 +105,9 @@ df_venue_data1 <- do.call(rbind, df1)
 # check the required data structure
 glimpse(df_venue_data1)
 ```
+
+In a second step, I make use of the meta data and interate over each page in 
+order to get all German venueas from ticketmaste.com. 
 
 ```{r GER advanced venue search, message=FALSE, eval=FALSE}
 # initialize empty data frame 
@@ -177,6 +183,7 @@ for (p in first_page:(last_page - 1)) {
   df_venue_data2 <- rbind(df_venue_data2, df_venue_data2_working)
   
   # limit of 5 requests per second
+  # set limit slightly higher since I receive spike errors 
   Sys.sleep(0.8)
   
   # print(paste0("loop: ", as.character(p)))
@@ -185,6 +192,11 @@ for (p in first_page:(last_page - 1)) {
 # save downloaded data
 save(df_venue_data2, file = "GER_venues.Rda")
 ```
+
+Since I store the downloaded data since I do not want to request the data each 
+time I run the script.
+
+Next, I remove some duplicates from the data frame. 
 
 ```{r GER tidy data, message=FALSE}
 # load downloaded data into working environment 
@@ -234,6 +246,9 @@ janitor::get_dupes(tidy_data, "name", "address", "city", "postalCode", "long")
 glimpse(tidy_data)
 ```
 
+Finally, I map the German venues and set some location boundaries to ensure that 
+only venues within German borders are included. 
+
 ```{r map German venues, message=FALSE, warning=FALSE}
 # define boundaries of German location data
 GER_max_lat <- 55.0846  # northernmost point 
@@ -273,6 +288,8 @@ ggplot() +
 ```
 
 ## Austrian venues 
+
+I repeat the same steps as above for Austria. 
 
 ```{r AT API, message=FALSE}
 # first get command for Austria 
