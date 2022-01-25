@@ -193,7 +193,7 @@ for (p in first_page:(last_page - 1)) {
 save(df_venue_data2, file = "GER_venues.Rda")
 ```
 
-Since I store the downloaded data since I do not want to request the data each 
+I store the downloaded data since I do not want to request the data each 
 time I run the script.
 
 Next, I remove some duplicates from the data frame. 
